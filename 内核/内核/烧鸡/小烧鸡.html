@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>小烧鸡内核</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(180deg, #f0f4ff 0%, #e8ecf5 100%);
+            min-height: 100vh;
+            padding-top: 70px;
+            padding-bottom: 40px;
+        }
+
+        .top-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 1000;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .back-btn-top {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: none;
+            border: none;
+            color: #1a1a2e;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 10px 16px;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn-top:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .back-btn-top .icon {
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .hero-section {
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        .hero-title {
+            font-size: 36px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+        }
+
+        .hero-tag {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .hero-channel {
+            color: #666;
+            font-size: 14px;
+        }
+
+
+
+        .section {
+            background: white;
+            border-radius: 24px;
+            padding: 30px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.06);
+            border: 1px solid rgba(0, 0, 0, 0.03);
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 6px;
+            height: 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+        }
+
+        .driver-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .driver-item {
+            background: linear-gradient(135deg, #f5f7ff 0%, #f0f4ff 100%);
+            padding: 16px 20px;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #2c3e50;
+            border: 2px solid #e8ecf5;
+            transition: all 0.3s ease;
+        }
+
+        .driver-item:hover {
+            transform: translateY(-3px);
+            border-color: #667eea;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+        }
+
+        .feature-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .feature-item {
+            background: linear-gradient(135deg, #f5f7ff 0%, #f0f4ff 100%);
+            padding: 20px;
+            border-radius: 16px;
+            border-left: 4px solid #667eea;
+        }
+
+        .feature-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-bottom: 8px;
+        }
+
+        .feature-desc {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .feature-tag {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .gallery-section {
+            margin-top: 30px;
+        }
+
+        .gallery-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 800;
+            color: #1a1a2e;
+            margin-bottom: 30px;
+        }
+
+        .gallery-grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .gallery-item {
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12);
+            transition: all 0.4s ease;
+        }
+
+        .gallery-item:hover {
+            transform: translateY(-6px) scale(1.02);
+            box-shadow: 0 16px 60px rgba(102, 126, 234, 0.2);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .gallery-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+            color: white;
+            padding: 40px 20px 20px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <button class="back-btn-top" onclick="goBack()">
+            <span class="icon">←</span>
+            <span>返回</span>
+        </button>
+    </div>
+
+    <div class="container">
+        <div class="hero-section">
+            <div class="hero-tag">✓ 公益</div>
+            <h1 class="hero-title">小烧鸡内核</h1>
+            <p class="hero-channel">飞机频道 <code>@appletzpd</code></p>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">支持驱动（11个）</h2>
+            <div class="driver-list">
+                <div class="driver-item">RT-DVE</div>
+                <div class="driver-item">RT-PROC</div>
+                <div class="driver-item">QX11.4</div>
+                <div class="driver-item">烧鸡内置</div>
+                <div class="driver-item">RT-HOOK</div>
+                <div class="driver-item">烧鸡HOOK1.0</div>
+                <div class="driver-item">KMA-KPM</div>
+                <div class="driver-item">烧鸡HOOK2.0</div>
+                <div class="driver-item">DitPro</div>
+                <div class="driver-item">老蒯断点</div>
+                <div class="driver-item">葫芦娃HOOK</div>
+            </div>
+        </div>
+
+        <div class="section">
+            
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <div class="feature-title">解密</div>
+                    <div class="feature-desc">解密功能</div>
+                    <span class="feature-tag">适配新版本</span>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-title">特色功能</div>
+                    <div class="feature-desc">准星显示UI</div>
+                    <div class="feature-desc">#显示名字、血量等信息</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-title">自瞄系统</div>
+                    <div class="feature-desc">
+                        • 掩体漏打 - 支持<br>
+                        • 普通触摸 - 支持<br>
+                        • 内核触摸 - 支持（需老蒯/葫芦娃hook）<br>
+                        • 陀螺仪无模块 - 支持<br>
+                        • 陀螺仪有模块 - 支持
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-title">断点追踪</div>
+                    <div class="feature-desc">特色功能支持狙击枪单独设置</div>
+                    
+                </div>
+                <div class="feature-item">
+                    <div class="feature-title">物质透视</div>
+                    <div class="feature-desc">
+                        • 基础物品 - 支持<br>
+                        • 指挥官活动 - 支持
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-title">颜色显示</div>
+                    <div class="feature-desc">
+                        • 人机单独调节 - 支持<br>
+                        • 真人单独调节 - 支持
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-title">网页雷达</div>
+                    <div class="feature-desc">支持网页雷达，数量：2</div>
+                    <span class="feature-tag">双雷达</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="gallery-section">
+            <h2 class="gallery-title">内核图片</h2>
+            <div class="gallery-grid">
+                <div class="gallery-item">
+                    <img src="1.jpg" alt="功能预览1">
+                </div>
+                <div class="gallery-item">
+                    <img src="2.jpg" alt="功能预览2">
+                </div>
+                <div class="gallery-item">
+                    <img src="3.jpg" alt="功能预览3">
+                </div>
+                <div class="gallery-item">
+                    <img src="4.jpg" alt="功能预览4">
+                </div>
+                <div class="gallery-item">
+                    <img src="5.jpg" alt="功能预览5">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function goBack() {
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.location.href = '../../内核.html';
+            }
+        }
+    </script>
+</body>
+</html>
