@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>葫芦娃内核</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;700;900&display=swap');
+
+:root {
+  --cyan: #00e5ff;
+  --cyan-dim: #00b8d4;
+  --cyan-glow: rgba(0, 229, 255, 0.35);
+  --blue: #0277bd;
+  --deep: #001a2e;
+  --deeper: #000d17;
+  --white: #f0faff;
+  --white-dim: rgba(240, 250, 255, 0.7);
+  --glass: rgba(0, 40, 70, 0.45);
+  --glass-border: rgba(0, 229, 255, 0.18);
+  --card-bg: rgba(0, 30, 55, 0.55);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--cyan-dim) var(--deeper);
+}
+
+body {
+  font-family: 'Noto Sans SC', sans-serif;
+  background: var(--deeper);
+  color: var(--white);
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* ===== 背景粒子网格 ===== */
+#bg-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ===== 扫描线效果 ===== */
+.scanlines {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 229, 255, 0.015) 2px,
+    rgba(0, 229, 255, 0.015) 4px
+  );
+}
+
+/* ===== 主容器 ===== */
+.container {
+  position: relative;
+  z-index: 2;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ===== 顶部导航 ===== */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  backdrop-filter: blur(20px) saturate(1.5);
+  background: rgba(0, 13, 23, 0.75);
+  border-bottom: 1px solid var(--glass-border);
+  padding: 0 24px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid var(--glass-border);
+  color: var(--cyan);
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 8px;
+  letter-spacing: 1px;
+  font-family: 'Noto Sans SC', sans-serif;
+  flex-shrink: 0;
+}
+
+.back-btn:hover {
+  background: var(--glass);
+  border-color: var(--cyan);
+}
+
+.nav-logo {
+  font-family: 'Orbitron', monospace;
+  font-weight: 900;
+  font-size: 20px;
+  color: var(--cyan);
+  text-shadow: 0 0 20px var(--cyan-glow);
+  letter-spacing: 3px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-logo .dot {
+  width: 8px; height: 8px;
+  background: var(--cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--cyan), 0 0 30px var(--cyan-glow);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.7); }
+}
+
+.nav-links {
+  display: flex;
+  gap: 32px;
+  list-style: none;
+}
+
+.nav-links a {
+  color: var(--white-dim);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: color 0.3s, text-shadow 0.3s;
+  position: relative;
+}
+
+.nav-links a:hover {
+  color: var(--cyan);
+  text-shadow: 0 0 12px var(--cyan-glow);
+}
+
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: -4px; left: 0;
+  width: 0; height: 1px;
+  background: var(--cyan);
+  transition: width 0.3s;
+}
+
+.nav-links a:hover::after { width: 100%; }
+
+.nav-badge {
+  background: linear-gradient(135deg, var(--cyan), var(--blue));
+  color: var(--deeper);
+  font-size: 10px;
+  font-weight: 900;
+  padding: 4px 10px;
+  border-radius: 20px;
+  letter-spacing: 1px;
+}
+
+/* ===== HERO 区域 ===== */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  padding-top: 64px;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, var(--cyan-glow) 0%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(80px);
+  animation: hero-glow 6s ease-in-out infinite alternate;
+}
+
+@keyframes hero-glow {
+  0% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.2); }
+}
+
+.hero-tag {
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin-bottom: 24px;
+  opacity: 0;
+  animation: fadeUp 0.8s 0.2s forwards;
+}
+
+.hero-title {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(48px, 8vw, 96px);
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #ffffff 0%, var(--cyan) 50%, var(--blue) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  opacity: 0;
+  animation: fadeUp 0.8s 0.4s forwards;
+  position: relative;
+}
+
+.hero-title-cn {
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: clamp(28px, 4vw, 48px);
+  font-weight: 900;
+  color: var(--white);
+  margin-bottom: 20px;
+  opacity: 0;
+  animation: fadeUp 0.8s 0.5s forwards;
+  letter-spacing: 12px;
+}
+
+.hero-sub {
+  font-size: 16px;
+  color: var(--white-dim);
+  max-width: 500px;
+  line-height: 1.8;
+  opacity: 0;
+  animation: fadeUp 0.8s 0.6s forwards;
+  margin-bottom: 40px;
+}
+
+.hero-badges {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  opacity: 0;
+  animation: fadeUp 0.8s 0.8s forwards;
+}
+
+.hero-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border: 1px solid var(--glass-border);
+  border-radius: 100px;
+  background: var(--glass);
+  backdrop-filter: blur(10px);
+  font-size: 13px;
+  color: var(--white);
+  transition: all 0.3s;
+}
+
+.hero-badge:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 20px var(--cyan-glow);
+  transform: translateY(-2px);
+}
+
+.hero-badge .icon {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== 区块标题 ===== */
+.section-header {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.section-tag {
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  letter-spacing: 5px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 36px;
+  font-weight: 900;
+  color: var(--white);
+  margin-bottom: 12px;
+}
+
+.section-line {
+  width: 60px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  margin: 0 auto;
+}
+
+/* ===== 驱动列表区 ===== */
+section {
+  padding: 100px 0;
+  position: relative;
+}
+
+.drivers-section {
+  background: linear-gradient(180deg, transparent, rgba(0, 229, 255, 0.03), transparent);
+}
+
+.drivers-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.driver-card {
+  position: relative;
+  padding: 20px 24px;
+  background: var(--card-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  overflow: hidden;
+  cursor: default;
+}
+
+.driver-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px; height: 100%;
+  background: var(--cyan);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.driver-card:hover::before { opacity: 1; }
+
+.driver-card:hover {
+  border-color: rgba(0, 229, 255, 0.4);
+  box-shadow: 0 8px 40px rgba(0, 229, 255, 0.1);
+  transform: translateX(4px);
+}
+
+.driver-card.recommended {
+  border-color: rgba(0, 229, 255, 0.35);
+  background: rgba(0, 50, 80, 0.5);
+}
+
+.driver-card.recommended .driver-badge {
+  display: inline-block;
+}
+
+.driver-num {
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  color: var(--cyan-dim);
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+.driver-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--white);
+}
+
+.driver-badge {
+  display: none;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--deeper);
+  background: var(--cyan);
+  padding: 2px 10px;
+  border-radius: 20px;
+  margin-left: 10px;
+  vertical-align: middle;
+  letter-spacing: 1px;
+}
+
+/* ===== 特色功能区 ===== */
+.features-section {
+  background: linear-gradient(180deg, transparent, rgba(0, 229, 255, 0.02), transparent);
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.feature-card {
+  position: relative;
+  padding: 36px 28px;
+  background: var(--card-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  transition: all 0.4s;
+  overflow: hidden;
+}
+
+.feature-card::after {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: radial-gradient(circle at center, rgba(0, 229, 255, 0.06) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.4s;
+  pointer-events: none;
+}
+
+.feature-card:hover::after { opacity: 1; }
+
+.feature-card:hover {
+  border-color: rgba(0, 229, 255, 0.3);
+  transform: translateY(-6px);
+  box-shadow: 0 20px 60px rgba(0, 229, 255, 0.08);
+}
+
+.feature-icon {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(2, 119, 189, 0.15));
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  font-size: 22px;
+}
+
+.feature-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--white);
+  margin-bottom: 10px;
+}
+
+.feature-desc {
+  font-size: 13px;
+  color: var(--white-dim);
+  line-height: 1.7;
+}
+
+.feature-tag {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--cyan);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  padding: 3px 12px;
+  border-radius: 20px;
+}
+
+/* ===== 自瞄区 ===== */
+.aim-section {
+  background: linear-gradient(180deg, transparent, rgba(0, 229, 255, 0.03), transparent);
+}
+
+.aim-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.aim-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: var(--card-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s;
+}
+
+.aim-item:hover {
+  border-color: rgba(0, 229, 255, 0.3);
+  transform: translateX(4px);
+}
+
+.aim-status {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.aim-status.on {
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan), 0 0 20px var(--cyan-glow);
+}
+
+.aim-status.off {
+  background: #37474f;
+  border: 1px solid #546e7a;
+}
+
+.aim-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--white);
+}
+
+.aim-detail {
+  font-size: 12px;
+  color: var(--white-dim);
+  margin-top: 2px;
+}
+
+/* ===== 解密 & 断点追 & 物质透 ===== */
+.spec-section {
+  background: linear-gradient(180deg, transparent, rgba(0, 229, 255, 0.02), transparent);
+}
+
+.spec-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.spec-block {
+  padding: 32px;
+  background: var(--card-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  text-align: center;
+  transition: all 0.4s;
+  position: relative;
+  overflow: hidden;
+}
+
+.spec-block::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.spec-block:hover::before { opacity: 1; }
+
+.spec-block:hover {
+  border-color: rgba(0, 229, 255, 0.3);
+  transform: translateY(-4px);
+  box-shadow: 0 16px 48px rgba(0, 229, 255, 0.08);
+}
+
+.spec-icon {
+  font-size: 32px;
+  margin-bottom: 16px;
+}
+
+.spec-title {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--white);
+  margin-bottom: 8px;
+}
+
+.spec-desc {
+  font-size: 13px;
+  color: var(--white-dim);
+  line-height: 1.6;
+}
+
+.spec-status {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--cyan);
+  padding: 4px 16px;
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  border-radius: 20px;
+  background: rgba(0, 229, 255, 0.08);
+}
+
+/* ===== 颜色显示 & 雷达 ===== */
+.extras-section {
+  background: linear-gradient(180deg, transparent, rgba(0, 229, 255, 0.03), transparent);
+}
+
+.gallery-section {
+  padding: 80px 0;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.gallery-item {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 30px rgba(0, 229, 255, 0.08);
+}
+
+.gallery-item img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.extras-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.extra-card {
+  padding: 36px;
+  background: var(--card-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  transition: all 0.4s;
+}
+
+.extra-card:hover {
+  border-color: rgba(0, 229, 255, 0.3);
+  box-shadow: 0 12px 40px rgba(0, 229, 255, 0.08);
+}
+
+.extra-title {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--white);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.extra-title .e-icon {
+  font-size: 24px;
+}
+
+.extra-list {
+  list-style: none;
+}
+
+.extra-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(0, 229, 255, 0.06);
+  font-size: 14px;
+  color: var(--white-dim);
+}
+
+.extra-list li:last-child { border-bottom: none; }
+
+.extra-list .check {
+  color: var(--cyan);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.radar-count {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.radar-num {
+  font-family: 'Orbitron', monospace;
+  font-size: 56px;
+  font-weight: 900;
+  color: var(--cyan);
+  text-shadow: 0 0 30px var(--cyan-glow);
+  line-height: 1;
+}
+
+.radar-label {
+  font-size: 14px;
+  color: var(--white-dim);
+}
+
+/* ===== 联系区 ===== */
+.contact-section {
+  padding-bottom: 80px;
+}
+
+.contact-box {
+  text-align: center;
+  padding: 60px 40px;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.08), rgba(2, 119, 189, 0.08));
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+}
+
+.contact-box::before {
+  content: '';
+  position: absolute;
+  top: -1px; left: -1px; right: -1px; bottom: -1px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, var(--cyan), var(--blue), var(--cyan));
+  z-index: -1;
+  opacity: 0.3;
+  filter: blur(1px);
+}
+
+.contact-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  letter-spacing: 5px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.contact-id {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(24px, 4vw, 40px);
+  font-weight: 900;
+  color: var(--white);
+  letter-spacing: 3px;
+  text-shadow: 0 0 30px var(--cyan-glow);
+}
+
+/* ===== 页脚 ===== */
+footer {
+  text-align: center;
+  padding: 40px 0;
+  font-size: 12px;
+  color: rgba(240, 250, 255, 0.3);
+  letter-spacing: 2px;
+  border-top: 1px solid rgba(0, 229, 255, 0.06);
+}
+
+/* ===== 滚动动画 ===== */
+.reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.7s, transform 0.7s;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 768px) {
+  .features-grid { grid-template-columns: 1fr; }
+  .aim-grid { grid-template-columns: 1fr; }
+  .spec-row { grid-template-columns: 1fr; }
+  .extras-grid { grid-template-columns: 1fr; }
+  .nav-links { display: none; }
+  nav { padding: 0 20px; }
+  .container { padding: 0 16px; }
+}
+
+/* ===== 自定义滚动条 ===== */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--deeper); }
+::-webkit-scrollbar-thumb { background: var(--cyan-dim); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="scanlines"></div>
+
+<!-- 导航 -->
+<nav>
+  <div class="nav-left">
+    <button class="back-btn" onclick="goBack()">← 返回</button>
+    <div class="nav-logo">
+      <span class="dot"></span>
+      HLW KERNEL
+    </div>
+  </div>
+  <ul class="nav-links">
+    <li><a href="#drivers">驱动</a></li>
+    <li><a href="#features">特色</a></li>
+    <li><a href="#aim">自瞄</a></li>
+    <li><a href="#spec">功能</a></li>
+    <li><a href="#contact">联系</a></li>
+  </ul>
+  <span class="nav-badge">公益</span>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <p class="hero-tag">HLW NB</p>
+    <h1 class="hero-title">HLW KERNEL</h1>
+    <h2 class="hero-title-cn">葫 芦 娃 内 核</h2>
+    <p class="hero-sub">九大驱动全场景覆盖 · 动态掩体漏打模型 · 内核级触摸与陀螺仪支持 · 网页雷达五端同步</p>
+    <div class="hero-badges">
+      <div class="hero-badge"><span class="icon"></span>9 驱动支持</div>
+      <div class="hero-badge"><span class="icon"></span>解密适配</div>
+      <div class="hero-badge"><span class="icon"></span>掩体漏打</div>
+      <div class="hero-badge"><span class="icon"></span>断点子追</div>
+    </div>
+  </div>
+</section>
+
+<!-- 驱动列表 -->
+<section class="drivers-section" id="drivers">
+  <div class="container">
+    <div class="section-header reveal">
+      <p class="section-tag">Drivers</p>
+      <h2 class="section-title">支持驱动</h2>
+      <div class="section-line"></div>
+    </div>
+    <div class="drivers-grid reveal">
+      <div class="driver-card recommended">
+        <div class="driver-num">DRIVER 01</div>
+        <div class="driver-name">葫芦娃HOOK[自动刷入]<span class="driver-badge">推荐</span></div>
+      </div>
+      <div class="driver-card">
+        <div class="driver-num">DRIVER 02</div>
+        <div class="driver-name">葫芦娃HOOK2</div>
+      </div>
+      <div class="driver-card">
+        <div class="driver-num">DRIVER 03</div>
+        <div class="driver-name">葫芦娃DEV</div>
+      </div>
+      <div class="driver-card">
+        <div class="driver-num">DRIVER 04</div>
+        <div class="driver-name">RT-HOOK</div>
+      </div>
+      <div class="driver-card">
+        <div class="driver-num">DRIVER 05</div>
+        <div class="driver-name">RT-DEV</div>
+      </div>
+      <div class="driver-card">
+        <div class="driver-num">DRIVER 06</div>
+        <div class="driver-name">DitPro</div>
+      </div>
+      <div class="driver-card">
+        <div class="driver-num">DRIVER 07</div>
+        <div class="driver-name">Orenge 橘子驱动</div>
+      </div>
+      <div class="driver-card">
+        <div class="driver-num">DRIVER 08</div>
+        <div class="driver-name">QX</div>
+      </div>
+      <div class="driver-card">
+        <div class="driver-num">DRIVER 09</div>
+        <div class="driver-name">KMA-KPM</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 特色功能 -->
+<section class="features-section" id="features">
+  <div class="container">
+    <div class="section-header reveal">
+      <p class="section-tag">Features</p>
+      <h2 class="section-title">特色功能</h2>
+      <div class="section-line"></div>
+    </div>
+    <div class="features-grid reveal">
+      <div class="feature-card">
+        <div class="feature-icon">🛡</div>
+        <div class="feature-title">动态掩体漏打模型</div>
+        <div class="feature-desc">智能识别掩体状态，动态调整漏打策略，支持全场景覆盖，无死角精准打击</div>
+        <span class="feature-tag">全场景</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📡</div>
+        <div class="feature-title">天线漏打变色</div>
+        <div class="feature-desc">天线状态实时变色反馈，直观感知漏打切换，操作更精准</div>
+        <span class="feature-tag">实时反馈</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <div class="feature-title">一加专用调度</div>
+        <div class="feature-desc">针对一加设备深度优化的专用调度方案，释放硬件极限性能</div>
+        <span class="feature-tag">一加专属</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔧</div>
+        <div class="feature-title">内核性能优化</div>
+        <div class="feature-desc">底层内核级性能调优，降低延迟提升帧率，流畅体验全面升级</div>
+        <span class="feature-tag">底层优化</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 自瞄 -->
+<section class="aim-section" id="aim">
+  <div class="container">
+    <div class="section-header reveal">
+      <p class="section-tag">Aim Assist</p>
+      <h2 class="section-title">自瞄系统</h2>
+      <div class="section-line"></div>
+    </div>
+    <div class="aim-grid reveal">
+      <div class="aim-item">
+        <span class="aim-status on"></span>
+        <div>
+          <div class="aim-label">掩体漏打</div>
+          <div class="aim-detail">智能掩体识别漏打</div>
+        </div>
+      </div>
+      <div class="aim-item">
+        <span class="aim-status off"></span>
+        <div>
+          <div class="aim-label">普通触摸</div>
+          <div class="aim-detail">不支持</div>
+        </div>
+      </div>
+      <div class="aim-item">
+        <span class="aim-status on"></span>
+        <div>
+          <div class="aim-label">内核触摸</div>
+          <div class="aim-detail">葫芦娃 / 橘子驱动支持</div>
+        </div>
+      </div>
+      <div class="aim-item">
+        <span class="aim-status on"></span>
+        <div>
+          <div class="aim-label">陀螺仪（无模块）</div>
+          <div class="aim-detail">原生陀螺仪支持</div>
+        </div>
+      </div>
+      <div class="aim-item">
+        <span class="aim-status on"></span>
+        <div>
+          <div class="aim-label">陀螺仪（有模块）</div>
+          <div class="aim-detail">模块增强陀螺仪支持</div>
+        </div>
+      </div>
+      <div class="aim-item">
+        <span class="aim-status on"></span>
+        <div>
+          <div class="aim-label">断点追</div>
+          <div class="aim-detail">断点追踪精准锁定</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 解密 / 物质透 -->
+<section class="spec-section" id="spec">
+  <div class="container">
+    <div class="section-header reveal">
+      <p class="section-tag">Other features</p>
+      <h2 class="section-title">其他功能</h2>
+      <div class="section-line"></div>
+    </div>
+    <div class="spec-row reveal">
+      <div class="spec-block">
+        <div class="spec-icon">🔓</div>
+        <div class="spec-title">解密</div>
+        <div class="spec-desc">适配新版本，持续跟进更新解密方案</div>
+        <span class="spec-status">已支持</span>
+      </div>
+      <div class="spec-block">
+        <div class="spec-icon">🎯</div>
+        <div class="spec-title">断点追</div>
+        <div class="spec-desc">精准断点追踪，锁定目标不丢失</div>
+        <span class="spec-status">已支持</span>
+      </div>
+      <div class="spec-block">
+        <div class="spec-icon">👁</div>
+        <div class="spec-title">物质透</div>
+        <div class="spec-desc">基础物品透视 + 指挥官活动透视</div>
+        <span class="spec-status">已支持</span>
+      </div>
+    </div>
+
+    <div class="extras-grid reveal">
+      <div class="extra-card">
+        <div class="extra-title"><span class="e-icon">🎨</span> 颜色显示</div>
+        <ul class="extra-list">
+          <li><span class="check">✓</span> 人机单独调节</li>
+          <li><span class="check">✓</span> 真人单独调节</li>
+        </ul>
+      </div>
+      <div class="extra-card">
+        <div class="extra-title"><span class="e-icon">📡</span> 网页雷达</div>
+        <ul class="extra-list">
+          <li><span class="check">✓</span> 网页端实时雷达</li>
+          <li><span class="check">✓</span> 多端同步显示</li>
+        </ul>
+        <div class="radar-count">
+          <span class="radar-num">5</span>
+          <span class="radar-label">端雷达同步</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 内核图片 -->
+<section class="gallery-section" id="gallery">
+  <div class="container">
+    <div class="section-header reveal">
+      <p class="section-tag">Gallery</p>
+      <h2 class="section-title">内核图片</h2>
+      <div class="section-line"></div>
+    </div>
+    <div class="gallery-grid reveal">
+      <div class="gallery-item"><img src="1.jpg" alt="预览1"></div>
+      <div class="gallery-item"><img src="2.jpg" alt="预览2"></div>
+      <div class="gallery-item"><img src="3.jpg" alt="预览3"></div>
+      <div class="gallery-item"><img src="4.jpg" alt="预览4"></div>
+      <div class="gallery-item"><img src="5.jpg" alt="预览5"></div>
+      <div class="gallery-item"><img src="6.jpg" alt="预览6"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 联系 -->
+<section class="contact-section" id="contact">
+  <div class="container">
+    <div class="contact-box reveal">
+      <p class="contact-label">Telegram</p>
+      <p class="contact-id">@HLWNHNBl</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">HLW KERNEL &copy; 2025 · 葫芦娃内核</div>
+</footer>
+
+<script>
+function goBack() {
+    if (window.history.length > 1) {
+        window.history.back();
+    } else {
+        window.location.href = '../../内核.html';
+    }
+}
+
+// ===== 背景粒子 =====
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let particles = [];
+let mouse = { x: -1000, y: -1000 };
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+document.addEventListener('mousemove', e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+
+class Particle {
+  constructor() {
+    this.reset();
+  }
+  reset() {
+    this.x = Math.random() * canvas.width;
+    this.y = Math.random() * canvas.height;
+    this.size = Math.random() * 1.5 + 0.5;
+    this.speedX = (Math.random() - 0.5) * 0.3;
+    this.speedY = (Math.random() - 0.5) * 0.3;
+    this.opacity = Math.random() * 0.5 + 0.1;
+  }
+  update() {
+    this.x += this.speedX;
+    this.y += this.speedY;
+    if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) {
+      this.reset();
+    }
+  }
+  draw() {
+    const dx = mouse.x - this.x;
+    const dy = mouse.y - this.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    let alpha = this.opacity;
+    if (dist < 150) {
+      alpha = this.opacity + (1 - this.opacity) * (1 - dist / 150);
+    }
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(0, 229, 255, ${alpha})`;
+    ctx.fill();
+  }
+}
+
+for (let i = 0; i < 80; i++) {
+  particles.push(new Particle());
+}
+
+function drawLines() {
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i + 1; j < particles.length; j++) {
+      const dx = particles[i].x - particles[j].x;
+      const dy = particles[i].y - particles[j].y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 120) {
+        ctx.beginPath();
+        ctx.moveTo(particles[i].x, particles[i].y);
+        ctx.lineTo(particles[j].x, particles[j].y);
+        ctx.strokeStyle = `rgba(0, 229, 255, ${0.06 * (1 - dist / 120)})`;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+function animate() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  particles.forEach(p => { p.update(); p.draw(); });
+  drawLines();
+  requestAnimationFrame(animate);
+}
+animate();
+
+// ===== 滚动显示 =====
+const reveals = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.15 });
+
+reveals.forEach(el => observer.observe(el));
+
+// ===== 导航滚动高亮 =====
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('.nav-links a');
+
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(section => {
+    const sectionTop = section.offsetTop - 100;
+    if (scrollY >= sectionTop) {
+      current = section.getAttribute('id');
+    }
+  });
+  navLinks.forEach(link => {
+    link.style.color = '';
+    link.style.textShadow = '';
+    if (link.getAttribute('href') === '#' + current) {
+      link.style.color = 'var(--cyan)';
+      link.style.textShadow = '0 0 12px var(--cyan-glow)';
+    }
+  });
+});
+</script>
+
+</body>
+</html>
